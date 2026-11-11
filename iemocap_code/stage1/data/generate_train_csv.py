@@ -3,7 +3,7 @@
 根据 train.emo 和 IEMOCAP 原始数据生成 train.csv
 格式: file,emotion,text,speaker
 """
-#第二步
+
 import os
 import glob
 import re
@@ -11,8 +11,8 @@ import pandas as pd
 
 def get_speaker_from_utt_id(utt_id):
     """从 utterance ID 提取真实说话人"""
-    session_num = utt_id[3:5]  # e.g., '05' from 'Ses05F_impro04_M004'
-    gender_char = utt_id.split('_')[-1][0]  # 'F' or 'M'
+    session_num = utt_id[3:5]
+    gender_char = utt_id.split('_')[-1][0]
     return f"Ses{session_num}{gender_char}"
 
 def main():
@@ -20,7 +20,7 @@ def main():
     LABEL_PATH = "feats/train.emo"
     OUTPUT_CSV = "feats/train.csv"
 
-    # 1. 读取 emotion 标签
+
     utt_to_emotion = {}
     with open(LABEL_PATH, 'r') as f:
         for line in f:
@@ -34,7 +34,7 @@ def main():
 
     print(f"加载了 {len(utt_to_emotion)} 个情感标签")
 
-    # 2. 读取文本转录（使用字符串分割，非正则）
+
     utt_to_text = {}
     for session in range(1, 6):
         trans_dir = os.path.join(IEMOCAP_ROOT, f"Session{session}", "dialog", "transcriptions")
@@ -58,7 +58,7 @@ def main():
 
     print(f"加载了 {len(utt_to_text)} 条文本")
 
-    # 3. 构建 CSV 数据
+
     rows = []
     missing_text = 0
     for utt_id, emotion in utt_to_emotion.items():
@@ -76,7 +76,7 @@ def main():
     if missing_text > 0:
         print(f"⚠ 警告: {missing_text} 个 utterance 缺少文本")
 
-    # 4. 保存 CSV
+
     df = pd.DataFrame(rows)
     df = df[['file', 'emotion', 'text', 'speaker']]
     df.to_csv(OUTPUT_CSV, index=False)

@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+/local_assets/
+/outputs/
+*.pt
+*.pth
+*.npz
+*.wav

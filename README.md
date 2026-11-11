@@ -1,94 +1,34 @@
 # MMSD
 
-Official implementation of **MMSD: A Multimodal Multitask Self-Distillation Framework for Audio-Text Emotion Recognition**.
+Code for **MMSD: A Multimodal Multitask Self-Distillation Framework for Audio-Text Emotion Recognition**.
 
-## Structure
+## Setup
 
-```text
-MMSD-main/
-  iemocap_code/
-    stage1/        # Stage-I multimodal multitask backbone
-    stage2/        # Stage-II self-distillation
-  meld_code/
-    stage1/
-    stage2/
-```
+Use Python 3.8+ and install `requirements.txt` with matching PyTorch and torchaudio builds. Set the paths in `configs/iemocap.json` and `configs/meld.json` to your manifests, WAV files, and local wav2vec 2.0 and RoBERTa models.
 
-## Requirements
+Each original manifest needs `file,text,emotion,speaker` columns and a WAV named `<file>.wav` for each row. IEMOCAP uses `Ses01...` IDs and four classes (`ang,hap,neu,sad`, with excitement merged into happiness). MELD uses its official train, dev, and test splits and `meld_train_dia0_utt0`-style IDs.
 
-The code was developed with Python 3.8 and PyTorch. Main dependencies:
-
-- torch
-- torchaudio
-- transformers
-- pandas
-- numpy
-- scikit-learn
-- tqdm
-- soundfile
+Stage II takes one augmented audio-text pair per training utterance. Keep the source `file` and label in the augmented CSV. The config specifies the augmented text column. The data utilities include [back-translation](meld_code/stage2/data/augment_text.py) and a [GPT-SoVITS client](meld_code/stage2/data/run_aug.py).
 
 ## IEMOCAP
 
-Run Stage-I training for one fold:
+Run from the repository root and repeat for folds 1–5.
 
 ```bash
-cd iemocap_code/stage1
-python train.py --fold 1 --seed 42
+python iemocap_code/stage1/train.py --fold 1 --output outputs/iem1/stage1
+python iemocap_code/stage2/generate_soft_labels.py --fold 1 --teacher outputs/iem1/stage1/best.pt --output outputs/iem1/targets.npz
+python iemocap_code/stage2/train_soft.py --fold 1 --teacher outputs/iem1/stage1/best.pt --targets outputs/iem1/targets.npz --output outputs/iem1/stage2
 ```
 
-Generate fold-specific soft labels:
-
-```bash
-cd iemocap_code/stage2
-python generate_soft_labels.py \
-  --models_dir checkpoints/iemocap_stage1 \
-  --csv_path feats/train_augmented_clean.csv \
-  --audio_dir data/aug_wav \
-  --output_dir soft_labels_dir
-```
-
-Run Stage-II self-distillation:
-
-```bash
-cd iemocap_code/stage2
-python train_soft.py \
-  --fold 1 \
-  --teacher_dir checkpoints/iemocap_stage1 \
-  --hard_csv feats/train2.csv \
-  --soft_csv feats/train_augmented_clean.csv \
-  --soft_labels_dir soft_labels_dir
-```
+Each fold selects its checkpoint by held-out-session WA and reports scores on that session. Average the five fold scores.
 
 ## MELD
 
-Run Stage-I training:
-
 ```bash
-cd meld_code/stage1
-python train.py
+python meld_code/stage1/train.py --output outputs/meld/stage1
+python meld_code/stage2/evaluate_meld_class_accuracy.py --checkpoint outputs/meld/stage1/best.pt --output outputs/meld/stage1_test
+python meld_code/stage2/generate_soft_labels.py --teacher outputs/meld/stage1/best.pt --output outputs/meld/targets.npz
+python meld_code/stage2/train_soft.py --teacher outputs/meld/stage1/best.pt --targets outputs/meld/targets.npz --output outputs/meld/stage2
 ```
 
-Generate soft labels:
-
-```bash
-cd meld_code/stage2
-python generate_soft_labels.py \
-  --model_path checkpoints/meld_stage1/meld_best_model.pt \
-  --csv_path data/aug_meld_processed/train/meld_train_augmented.csv \
-  --audio_dir data/aug_meld_processed/train/wavs \
-  --output_dir meld_soft_labels_dir
-```
-
-Run Stage-II self-distillation:
-
-```bash
-cd meld_code/stage2
-python train_soft.py \
-  --teacher_model checkpoints/meld_stage1/meld_best_model.pt \
-  --train_csv_hard data/meld_processed/train/meld_train.csv \
-  --train_csv_soft data/aug_meld_processed/train/meld_train_augmented.csv \
-  --train_audio_hard data/meld_processed/train/wavs \
-  --train_audio_soft data/aug_meld_processed/train/wavs
-```
-
-Dataset files and checkpoints are not included. Please prepare IEMOCAP and MELD according to their official licenses and pass the corresponding paths through command-line arguments when your local layout differs from the defaults above.
+MELD selects checkpoints by development-set WA and reports scores on the test split. Both datasets use 60 Stage I epochs and 30 Stage II epochs. Stage II uses CE, teacher distillation, CTC, and audio-text contrastive losses. Use `--seed` on `train_soft.py` to repeat Stage II with the same teacher and targets.
