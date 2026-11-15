@@ -20,7 +20,7 @@ python iemocap_code/stage2/generate_soft_labels.py --fold 1 --teacher outputs/ie
 python iemocap_code/stage2/train_soft.py --fold 1 --teacher outputs/iem1/stage1/best.pt --targets outputs/iem1/targets.npz --output outputs/iem1/stage2
 ```
 
-Each fold selects its checkpoint by held-out-session WA and reports scores on that session. Average the five fold scores.
+Report scores on the held-out session for each fold and average the five fold scores.
 
 ## MELD
 
